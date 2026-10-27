@@ -1,9 +1,10 @@
 // Service worker: guarda la app dentro del teléfono para que abra sin señal.
 // Sube el número de versión cada vez que cambie algún archivo de la app.
-const CACHE = 'midinero-v2.0.1';
+const CACHE = 'midinero-v2.1.0';
 const ASSETS = [
   './', './index.html', './styles.css', './app.js', './store.js', './sync.js', './config.js',
-  './qrcode.js', './jsQR.js', './manifest.json', './icon-180.png', './icon-192.png', './icon-512.png'
+  './qrcode.js', './jsQR.js', './manifest.json', './icon-180.png', './icon-192.png', './icon-512.png',
+  './temas/madrid-1.jpg', './temas/madrid-2.jpg', './temas/madrid-3.jpg'
 ];
 
 self.addEventListener('install', event => {

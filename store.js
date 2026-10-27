@@ -9,7 +9,7 @@
 const Store = (() => {
   const KEY = 'midinero.v2';
   const DIRTY_KEY = 'midinero.dirty';
-  const COLS = ['accounts', 'categories', 'transactions', 'goals', 'debts', 'recurring'];
+  const COLS = ['accounts', 'categories', 'transactions', 'goals', 'debts', 'recurring', 'conteos'];
 
   const DEFAULT_CATS = ['Alimentos', 'Casa', 'Transporte', 'Servicios', 'Restaurantes', 'Entretenimiento', 'Salud', 'Compras', 'Otros'];
 
@@ -28,7 +28,7 @@ const Store = (() => {
         { id: 'banco', name: 'Banco', type: 'corriente', saldoInicial: 0, updatedAt: t }
       ],
       categories: DEFAULT_CATS.map(n => ({ id: n, name: n, budget: 0, updatedAt: t })),
-      transactions: [], goals: [], debts: [], recurring: [],
+      transactions: [], goals: [], debts: [], recurring: [], conteos: [],
       selectedAccount: 'efectivo'
     };
   }

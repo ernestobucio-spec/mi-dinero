@@ -25,6 +25,8 @@ let selDay = isoOf(today);
 let infY = today.getFullYear(), infM = today.getMonth();
 let infType = 'ig';
 let searchQ = '';
+let saldoModo = 'mov';
+let conteoTimer = null;
 let editTxId = null, editKind = 'gasto';
 let editAccId = null, editGoalId = null, contribGoalId = null, budgetCatName = null;
 let editDebtId = null, payDebtId = null;
@@ -94,7 +96,8 @@ async function init(){
   if(!state){ state = Store.defaultState(); persist(); }
   window.App = { state, onRemoteChange };
   document.getElementById('hoy-ico').textContent = today.getDate();
-  bindChrome(); bindKeys(); bindSync();
+  applyTema();
+  bindChrome(); bindKeys(); bindSync(); bindTema();
   handleLinkHash();
   render();
   if('serviceWorker' in navigator && !IS_ELECTRON && location.protocol.startsWith('http')){
@@ -169,6 +172,7 @@ function bindChrome(){
   document.getElementById('st-restore').addEventListener('click', doRestore);
   document.getElementById('st-file').addEventListener('change', onRestoreFile);
   document.getElementById('st-wipe').addEventListener('click', doWipe);
+  document.getElementById('st-tema').addEventListener('click', ()=>{ hide('settings-overlay'); openTema(); });
   // nube
   document.getElementById('sync-btn').addEventListener('click', openSync);
   document.getElementById('sync-pill').addEventListener('click', openSync);
@@ -256,7 +260,7 @@ function renderResumen(){
 
   return `<div class="dash">
     <div class="dash-hero"><div class="label">Patrimonio neto</div><div class="net">${fmt(nw)}</div>
-      <div class="sub">Activos ${fmt(assets)}${debt>0?` · Deudas ${fmt(debt)}`:''}</div></div>
+      <div class="sub">Activos ${fmt(assets)}${debt>0?` · Deudas ${fmt(debt)}`:''}</div>${temaActual()==='madrid'?'<div class="hala">¡Hala Madrid!</div>':''}</div>
     <div class="kpis">
       <div class="kpi"><div class="k-label">Ingresos</div><div class="k-val" style="color:var(--green)">${fmt(t.ing)}</div><div class="k-foot">${MES_LARGO[today.getMonth()]}</div></div>
       <div class="kpi"><div class="k-label">Gastos</div><div class="k-val" style="color:var(--red)">${fmt(t.gas)}</div><div class="k-foot">${MES_LARGO[today.getMonth()]}</div></div>
@@ -292,7 +296,11 @@ function runningFor(id){
   for(const t of txs){ bal += effect(t,id); map[t.id]=bal; }
   return map;
 }
+function segHtml(modo){
+  return `<div class="seg"><button class="seg-btn ${modo==='mov'?'active':''}" data-modo="mov">Movimientos</button><button class="seg-btn ${modo==='conteo'?'active':''}" data-modo="conteo">Conteo de efectivo</button></div>`;
+}
 function renderSaldo(){
+  if(saldoModo==='conteo') return renderConteo();
   const accs=accounts();
   if(!accs.some(a=>a.id===state.selectedAccount)) state.selectedAccount = accs[0] && accs[0].id;
   const corr = accs.filter(a=>a.type!=='credito'), cred = accs.filter(a=>a.type==='credito');
@@ -315,7 +323,7 @@ function renderSaldo(){
       <div class="tx-right"><span class="tx-amount ${cls}">${fmt(Math.abs(t.amount))}</span><div class="tx-running">${fmt(run[t.id])}</div></div></div>`;
   }).join('') : '<div class="empty">Sin movimientos para esta cuenta</div>';
 
-  return `<div class="saldo-wrap"><div class="accounts-col">
+  return `<div class="saldo-outer">${segHtml('mov')}<div class="saldo-wrap"><div class="accounts-col">
       <div class="section-head"><span>Cuentas</span><span class="total">${fmt(totCorr)}</span></div>
       ${corr.map(accRow).join('')}
       <div class="section-head"><span>Tarjetas de crédito</span><span class="total">${fmt(totCred)}</span></div>
@@ -323,7 +331,65 @@ function renderSaldo(){
       <div class="add-account" id="add-acc">+ Cuenta</div>
     </div><div class="tx-col">
       <div class="search-wrap"><input id="tx-search" type="search" placeholder="🔍  Buscar movimientos…" value="${esc(searchQ)}" /></div>
-      ${txHtml}</div></div>`;
+      ${txHtml}</div></div></div>`;
+}
+
+
+/* ----------------------------- Vista: Conteo de efectivo ----------------------------- */
+const CONTEO_BILLETES=[5,10,20,50,100,200,500,1000];
+const CONTEO_PACAS=[2000,5000,10000,20000,50000];
+function conteoRec(){
+  if(!Array.isArray(state.conteos)) state.conteos=[];
+  let r=state.conteos.find(x=>x.id==='caja' && !x.deleted);
+  if(!r){ r={ id:'caja', cant:{}, updatedAt:Store.now() }; state.conteos.push(r); }
+  if(!r.cant) r.cant={};
+  return r;
+}
+function conteoTotales(c){
+  let b=0,p=0;
+  CONTEO_BILLETES.forEach(d=>{ b+=d*(Number(c['b'+d])||0); });
+  CONTEO_PACAS.forEach(d=>{ p+=d*(Number(c['p'+d])||0); });
+  return { b, p, t:b+p };
+}
+function renderConteo(){
+  const r=conteoRec(); const c=r.cant; const t=conteoTotales(c);
+  const fila=(k,d)=>`<div class="ct-row"><input class="ct-in" data-k="${k}" type="number" inputmode="numeric" min="0" placeholder="0" value="${c[k]?esc(c[k]):''}" /><span class="ct-den">${fmt(d)}</span><span class="ct-sub" data-sub="${k}">${fmt(d*(Number(c[k])||0))}</span></div>`;
+  const head=`<div class="ct-head"><span>Cantidad</span><span>Denominación</span><span>Subtotal</span></div>`;
+  return `<div class="conteo-wrap">${segHtml('conteo')}
+    <div class="ct-grid">
+      <div class="ct-card"><div class="ct-title">Billetes y monedas</div>${head}
+        ${CONTEO_BILLETES.map(d=>fila('b'+d,d)).join('')}
+        <div class="ct-tot"><span>Subtotal billetes</span><b id="ct-b">${fmt(t.b)}</b></div></div>
+      <div class="ct-card"><div class="ct-title">Pacas</div>${head}
+        ${CONTEO_PACAS.map(d=>fila('p'+d,d)).join('')}
+        <div class="ct-tot"><span>Subtotal pacas</span><b id="ct-p">${fmt(t.p)}</b></div>
+        <div class="ct-tot grand"><span>Total caja fuerte</span><b id="ct-t">${fmt(t.t)}</b></div>
+        <div class="ct-note">El total de la caja = billetes + pacas. El conteo se guarda solo y se sincroniza entre tus dispositivos.</div></div>
+    </div>
+    <div class="ct-actions"><button class="btn" id="ct-clear">Limpiar todo</button><button class="btn primary" id="ct-apply">Ajustar saldo de Efectivo al total</button></div>
+  </div>`;
+}
+function conteoInput(inp){
+  const r=conteoRec(); const k=inp.dataset.k; const v=Math.max(0, Math.floor(Number(inp.value)||0));
+  if(v) r.cant[k]=v; else delete r.cant[k];
+  const d=Number(k.slice(1)); const sub=document.querySelector(`[data-sub="${k}"]`); if(sub) sub.textContent=fmt(d*v);
+  const t=conteoTotales(r.cant);
+  const eb=document.getElementById('ct-b'), ep=document.getElementById('ct-p'), et=document.getElementById('ct-t');
+  if(eb) eb.textContent=fmt(t.b); if(ep) ep.textContent=fmt(t.p); if(et) et.textContent=fmt(t.t);
+  clearTimeout(conteoTimer); conteoTimer=setTimeout(()=>touch('conteos', r), 600);
+}
+function conteoClear(){
+  if(!confirm('¿Poner todas las cantidades en cero?')) return;
+  const r=conteoRec(); r.cant={}; touch('conteos', r); render();
+}
+function conteoApply(){
+  const r=conteoRec(); const t=conteoTotales(r.cant).t;
+  const accs=accounts(); if(!accs.length) return;
+  const a = accs.find(x=>/efectivo|caja/i.test(x.name)) || acc(state.selectedAccount) || accs[0];
+  const cur=balanceOf(a);
+  if(!confirm(`La cuenta "${a.name}" tiene ${fmt(cur)} y el conteo da ${fmt(t)}. ¿Ajustar su saldo a ${fmt(t)}?`)) return;
+  a.saldoInicial = Math.round(((Number(a.saldoInicial)||0) + (t-cur))*100)/100; touch('accounts', a);
+  toast(`Saldo de ${a.name} ajustado a ${fmt(t)}`);
 }
 
 /* ----------------------------- Vista: Hoy ----------------------------- */
@@ -540,6 +606,7 @@ function renderMas(){
     </div>
     <div class="mas-card">
       ${row('☁️','Nube y sincronización',syncSub,'sync')}
+      ${row('🎨','Tema de la app', temaActual()==='madrid'?'Real Madrid':'Clásico','tema')}
       ${row('⚙️','Datos y respaldo','Respaldar, restaurar o borrar','settings')}
     </div>
     <p class="settings-note" style="text-align:center">Mi Dinero Pro · v${(window.MD_CONFIG&&window.MD_CONFIG.VERSION)||'2'}</p>
@@ -553,13 +620,17 @@ function wireView(){
     r.addEventListener('dblclick',()=> openAccModal(r.dataset.acc));
   });
   const addAcc=document.getElementById('add-acc'); if(addAcc) addAcc.addEventListener('click',()=>openAccModal(null));
+  document.querySelectorAll('.seg-btn[data-modo]').forEach(b=> b.addEventListener('click',()=>{ saldoModo=b.dataset.modo; render(); }));
+  document.querySelectorAll('.ct-in').forEach(i=> i.addEventListener('input',()=>conteoInput(i)));
+  const cc=document.getElementById('ct-clear'); if(cc) cc.addEventListener('click', conteoClear);
+  const ca=document.getElementById('ct-apply'); if(ca) ca.addEventListener('click', conteoApply);
   document.querySelectorAll('[data-tx]').forEach(r=> r.addEventListener('click',()=> openTxModal(r.dataset.tx)));
   document.querySelectorAll('[data-go]').forEach(r=> r.addEventListener('click',()=>{ navTo(r.dataset.go); }));
   document.querySelectorAll('[data-goal]').forEach(r=> r.addEventListener('click',()=> navTo('metas')));
   document.querySelectorAll('[data-pay]').forEach(b=> b.addEventListener('click',(e)=>{ e.stopPropagation(); payRecurring(b.dataset.pay); }));
   document.querySelectorAll('.mas-row[data-act]').forEach(r=> r.addEventListener('click',()=>{
     const a=r.dataset.act;
-    if(a.startsWith('view:')) navTo(a.slice(5)); else if(a==='sync') openSync(); else if(a==='settings') openSettings();
+    if(a.startsWith('view:')) navTo(a.slice(5)); else if(a==='sync') openSync(); else if(a==='settings') openSettings(); else if(a==='tema') openTema();
   }));
 
   const s=document.getElementById('tx-search');
@@ -908,6 +979,34 @@ async function exportPrintMonth(){
   if(navigator.canShare && navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file], title:'Reporte del mes'}); return; }catch(e){} }
   const w=window.open('', '_blank'); if(w){ w.document.write(html); w.document.close(); setTimeout(()=>{ try{w.print();}catch(e){} }, 400); }
   else { const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); }
+}
+
+
+/* ----------------------------- Tema ----------------------------- */
+function temaActual(){ try{ return localStorage.getItem('midinero.tema')||'clasico'; }catch(e){ return 'clasico'; } }
+function fondoActual(){ try{ return localStorage.getItem('midinero.fondo')||'1'; }catch(e){ return '1'; } }
+function applyTema(){
+  const t=temaActual(), f=fondoActual();
+  document.documentElement.dataset.tema=t; document.documentElement.dataset.fondo=f;
+  const m=document.querySelector('meta[name="theme-color"]'); if(m) m.content = (t==='madrid'?'#05050f':'#0a0a0c');
+}
+function refreshTemaModal(){
+  const t=temaActual(), f=fondoActual();
+  document.querySelectorAll('.tema-card').forEach(b=>b.classList.toggle('active', b.dataset.tema===t));
+  document.getElementById('tema-fondos').classList.toggle('hidden', t!=='madrid');
+  document.querySelectorAll('.fondo-btn').forEach(b=>b.classList.toggle('active', b.dataset.fondo===f));
+}
+function openTema(){ refreshTemaModal(); show('tema-overlay'); }
+function bindTema(){
+  document.getElementById('tema-close').addEventListener('click', ()=>hide('tema-overlay'));
+  document.querySelectorAll('.tema-card').forEach(b=> b.addEventListener('click', ()=>{
+    try{ localStorage.setItem('midinero.tema', b.dataset.tema); }catch(e){}
+    applyTema(); refreshTemaModal(); render();
+  }));
+  document.querySelectorAll('.fondo-btn').forEach(b=> b.addEventListener('click', ()=>{
+    try{ localStorage.setItem('midinero.fondo', b.dataset.fondo); }catch(e){}
+    applyTema(); refreshTemaModal();
+  }));
 }
 
 /* ----------------------------- Nube / sincronización ----------------------------- */

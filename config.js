@@ -9,5 +9,5 @@ window.MD_CONFIG = {
   SUPABASE_KEY: 'sb_publishable_vN2mDuOuSxeyOYC2zycnRQ_Loez2tci',
   // Dirección pública de la app web (GitHub Pages). Se usa para los códigos QR de vinculación.
   APP_URL: 'https://ernestobucio-spec.github.io/mi-dinero/',
-  VERSION: '2.0.1'
+  VERSION: '2.1.0'
 };

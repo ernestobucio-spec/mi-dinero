@@ -173,9 +173,32 @@
       <button class="btn primary block" id="st-backup">⤓  Respaldar todo (archivo)</button>
       <button class="btn block" id="st-restore">⤴  Restaurar desde un respaldo</button>
       <input type="file" id="st-file" accept="application/json,.json" class="hidden" />
+      <button class="btn block" id="st-tema">🎨  Tema de la app</button>
       <button class="btn danger block" id="st-wipe">🗑  Borrar todos los datos de este dispositivo</button>
       <p class="settings-note" id="settings-version"></p>
       <div class="modal-actions"><div class="spacer"></div><button id="st-close" class="btn">Cerrar</button></div>
+    </div>
+  </div>
+
+
+  <!-- Modal: tema -->
+  <div id="tema-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>Tema de la app</h3>
+      <p class="settings-note">Como en los celulares de antes: elige el tema y, si quieres, el fondo.</p>
+      <div class="tema-grid">
+        <button class="tema-card" data-tema="clasico"><span class="tema-prev clasico"></span><span>Clásico</span></button>
+        <button class="tema-card" data-tema="madrid"><span class="tema-prev madrid"></span><span>Real Madrid</span></button>
+      </div>
+      <div id="tema-fondos" class="tema-fondos hidden">
+        <p class="settings-note">Fondo de pantalla:</p>
+        <div class="fondo-row">
+          <button class="fondo-btn" data-fondo="1"><img src="temas/madrid-1.jpg" alt="Fondo 1" /></button>
+          <button class="fondo-btn" data-fondo="2"><img src="temas/madrid-2.jpg" alt="Fondo 2" /></button>
+          <button class="fondo-btn" data-fondo="3"><img src="temas/madrid-3.jpg" alt="Fondo 3" /></button>
+        </div>
+      </div>
+      <div class="modal-actions"><div class="spacer"></div><button id="tema-close" class="btn">Cerrar</button></div>
     </div>
   </div>
 
