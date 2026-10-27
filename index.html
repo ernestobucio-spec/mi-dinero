@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://*.supabase.co http://localhost:* http://127.0.0.1:*; img-src 'self' data: blob:; media-src 'self' blob:" />
+  <title>Mi Dinero Pro</title>
+  <meta name="theme-color" content="#0a0a0c" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Mi Dinero" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
+  <link rel="icon" href="icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Barra lateral (escritorio) -->
+    <nav class="sidebar">
+      <div class="nav-top">
+        <button class="nav-item active" data-view="resumen"><span class="nav-ico">&#127968;</span><span class="nav-label">Resumen</span></button>
+        <button class="nav-item" data-view="hoy"><span class="nav-ico cal-ico" id="hoy-ico">22</span><span class="nav-label">Hoy</span></button>
+        <button class="nav-item" data-view="saldo"><span class="nav-ico">&#9878;</span><span class="nav-label">Saldo</span></button>
+        <button class="nav-item" data-view="presupuesto"><span class="nav-ico">&#128203;</span><span class="nav-label">Presupuesto</span></button>
+        <button class="nav-item" data-view="metas"><span class="nav-ico">&#127919;</span><span class="nav-label">Metas</span></button>
+        <button class="nav-item" data-view="deudas"><span class="nav-ico">&#128179;</span><span class="nav-label">Deudas</span></button>
+        <button class="nav-item" data-view="informes"><span class="nav-ico">&#128202;</span><span class="nav-label">Informes</span></button>
+      </div>
+      <div class="nav-bottom">
+        <button class="nav-item" id="sync-btn"><span class="nav-ico sync-ico" id="sync-ico">&#9729;</span><span class="nav-label">Nube</span></button>
+        <button class="nav-item" id="settings-btn"><span class="nav-ico">&#9881;</span><span class="nav-label">Datos</span></button>
+      </div>
+    </nav>
+
+    <!-- Contenido -->
+    <main class="content">
+      <header class="topbar">
+        <div class="topbar-left"><button id="btn-edit" class="link-btn">Editar</button></div>
+        <div class="topbar-center" id="topbar-title">Resumen</div>
+        <div class="topbar-right">
+          <button id="sync-pill" class="sync-pill" title="Estado de la nube"><span class="dot"></span><span class="txt">Nube</span></button>
+          <button id="btn-add" class="icon-btn" title="Agregar movimiento (N)">+</button>
+        </div>
+      </header>
+      <section id="view-root" class="view-root"></section>
+    </main>
+
+    <!-- Barra inferior (teléfono) -->
+    <nav class="tabbar">
+      <button class="tab active" data-view="resumen"><span class="t-ico">&#127968;</span><span>Resumen</span></button>
+      <button class="tab" data-view="saldo"><span class="t-ico">&#9878;</span><span>Saldo</span></button>
+      <button class="tab tab-add" id="tab-add"><span class="t-plus">+</span></button>
+      <button class="tab" data-view="presupuesto"><span class="t-ico">&#128203;</span><span>Presup.</span></button>
+      <button class="tab" data-view="mas"><span class="t-ico">&#8943;</span><span>Más</span></button>
+    </nav>
+  </div>
+
+  <!-- Modal: movimiento -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h3 id="modal-title">Nuevo movimiento</h3>
+      <div class="modal-tabs">
+        <button class="mtab active" data-kind="gasto">Gasto</button>
+        <button class="mtab" data-kind="ingreso">Ingreso</button>
+        <button class="mtab" data-kind="traspaso">Traspaso</button>
+      </div>
+      <label>Monto<input type="number" id="f-amount" placeholder="0.00" step="0.01" inputmode="decimal" /></label>
+      <label>Descripción<input type="text" id="f-desc" placeholder="Ej. Supermercado" autocomplete="off" /></label>
+      <label id="lbl-category">Categoría<select id="f-category"></select></label>
+      <label id="lbl-account">Cuenta<select id="f-account"></select></label>
+      <label id="lbl-account-to" class="hidden">Cuenta destino<select id="f-account-to"></select></label>
+      <label>Fecha<input type="date" id="f-date" /></label>
+      <label class="check-row"><input type="checkbox" id="f-recurring" /><span>Repetir cada mes (pago recurrente)</span></label>
+      <div class="modal-actions">
+        <button id="btn-delete" class="btn danger hidden">Eliminar</button>
+        <div class="spacer"></div>
+        <button id="btn-cancel" class="btn">Cancelar</button>
+        <button id="btn-save" class="btn primary">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: cuenta -->
+  <div id="acc-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h3 id="acc-title">Nueva cuenta</h3>
+      <label>Nombre<input type="text" id="a-name" placeholder="Ej. Santander" /></label>
+      <label>Tipo<select id="a-type"><option value="corriente">Cuenta corriente / efectivo</option><option value="credito">Tarjeta de crédito</option></select></label>
+      <label>Saldo actual<input type="number" id="a-balance" placeholder="0.00" step="0.01" inputmode="decimal" /></label>
+      <div class="modal-actions">
+        <button id="a-delete" class="btn danger hidden">Eliminar</button>
+        <div class="spacer"></div>
+        <button id="a-cancel" class="btn">Cancelar</button>
+        <button id="a-save" class="btn primary">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: meta -->
+  <div id="goal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h3 id="goal-title">Nueva meta</h3>
+      <label>Nombre<input type="text" id="g-name" placeholder="Ej. Fondo de emergencia" /></label>
+      <label>Ícono<select id="g-icon"></select></label>
+      <label>Monto objetivo<input type="number" id="g-target" placeholder="0.00" step="0.01" inputmode="decimal" /></label>
+      <label>Ahorrado actual<input type="number" id="g-saved" placeholder="0.00" step="0.01" inputmode="decimal" /></label>
+      <label>Fecha objetivo<input type="date" id="g-date" /></label>
+      <div class="modal-actions">
+        <button id="g-delete" class="btn danger hidden">Eliminar</button>
+        <div class="spacer"></div>
+        <button id="g-cancel" class="btn">Cancelar</button>
+        <button id="g-save" class="btn primary">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: aportar a meta -->
+  <div id="contrib-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h3 id="contrib-title">Aportar a meta</h3>
+      <label>Monto a aportar<input type="number" id="c-amount" placeholder="0.00" step="0.01" inputmode="decimal" /></label>
+      <div class="modal-actions"><div class="spacer"></div><button id="c-cancel" class="btn">Cancelar</button><button id="c-save" class="btn primary">Aportar</button></div>
+    </div>
+  </div>
+
+  <!-- Modal: presupuesto -->
+  <div id="budget-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h3 id="budget-title">Presupuesto mensual</h3>
+      <label>Categoría<input type="text" id="b-cat" disabled /></label>
+      <label>Presupuesto mensual<input type="number" id="b-amount" placeholder="0.00" step="0.01" inputmode="decimal" /></label>
+      <div class="modal-actions"><div class="spacer"></div><button id="b-cancel" class="btn">Cancelar</button><button id="b-save" class="btn primary">Guardar</button></div>
+    </div>
+  </div>
+
+  <!-- Modal: deuda -->
+  <div id="debt-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h3 id="debt-title">Nueva deuda</h3>
+      <label>Nombre<input type="text" id="d-name" placeholder="Ej. Tarjeta Oro, Préstamo auto" /></label>
+      <label>Ícono<select id="d-icon"></select></label>
+      <label>Saldo que debes hoy<input type="number" id="d-balance" placeholder="0.00" step="0.01" inputmode="decimal" /></label>
+      <label>Monto original (opcional)<input type="number" id="d-original" placeholder="0.00" step="0.01" inputmode="decimal" /></label>
+      <label>Tasa de interés anual % (opcional)<input type="number" id="d-apr" placeholder="0" step="0.01" inputmode="decimal" /></label>
+      <label>Pago mensual (opcional)<input type="number" id="d-pay" placeholder="0.00" step="0.01" inputmode="decimal" /></label>
+      <div class="modal-actions">
+        <button id="d-delete" class="btn danger hidden">Eliminar</button>
+        <div class="spacer"></div>
+        <button id="d-cancel" class="btn">Cancelar</button>
+        <button id="d-save" class="btn primary">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: pago a deuda -->
+  <div id="dpay-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h3 id="dpay-title">Registrar pago</h3>
+      <label>Monto del pago<input type="number" id="dp-amount" placeholder="0.00" step="0.01" inputmode="decimal" /></label>
+      <label class="check-row"><input type="checkbox" id="dp-fromacc" checked /><span>Descontar de una cuenta (registra el gasto)</span></label>
+      <label id="dp-acc-label">Cuenta<select id="dp-account"></select></label>
+      <div class="modal-actions"><div class="spacer"></div><button id="dp-cancel" class="btn">Cancelar</button><button id="dp-save" class="btn primary">Pagar</button></div>
+    </div>
+  </div>
+
+  <!-- Modal: datos / respaldo -->
+  <div id="settings-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>Datos y respaldo</h3>
+      <p class="settings-note" id="settings-note">Tus datos se guardan automáticamente en este dispositivo y, si está vinculado, en la nube.</p>
+      <button class="btn primary block" id="st-backup">⤓  Respaldar todo (archivo)</button>
+      <button class="btn block" id="st-restore">⤴  Restaurar desde un respaldo</button>
+      <input type="file" id="st-file" accept="application/json,.json" class="hidden" />
+      <button class="btn danger block" id="st-wipe">🗑  Borrar todos los datos de este dispositivo</button>
+      <p class="settings-note" id="settings-version"></p>
+      <div class="modal-actions"><div class="spacer"></div><button id="st-close" class="btn">Cerrar</button></div>
+    </div>
+  </div>
+
+  <!-- Modal: nube / sincronización -->
+  <div id="sync-overlay" class="modal-overlay hidden">
+    <div class="modal modal-wide">
+      <h3>Nube y sincronización</h3>
+      <div id="sync-body"></div>
+      <div class="modal-actions"><div class="spacer"></div><button id="sy-close" class="btn">Cerrar</button></div>
+    </div>
+  </div>
+
+  <!-- Modal: escanear QR -->
+  <div id="scan-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>Escanear código de la Mac</h3>
+      <p class="settings-note">Apunta la cámara al código QR que muestra Mi Dinero Pro en la Mac (Nube → Mostrar código).</p>
+      <div class="scan-box"><video id="scan-video" playsinline muted></video><div class="scan-frame"></div></div>
+      <p class="settings-note" id="scan-msg"></p>
+      <canvas id="scan-canvas" class="hidden"></canvas>
+      <div class="modal-actions"><div class="spacer"></div><button id="scan-cancel" class="btn">Cancelar</button></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="config.js"></script>
+  <script src="qrcode.js"></script>
+  <script src="jsQR.js"></script>
+  <script src="store.js"></script>
+  <script src="sync.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
