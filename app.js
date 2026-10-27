@@ -937,7 +937,7 @@ function renderSyncBody(){
       <p class="sy-meta">Vincula tus dispositivos con una <b>clave de sincronización</b>. Guárdala bien: es lo único que protege tus datos y no se puede recuperar.</p>
       <div class="sy-row"><button class="btn primary" id="sy-crear">Crear espacio nuevo (primera vez)</button></div>
       <p class="sy-meta" style="margin-top:6px">¿Ya creaste el espacio en tu otro dispositivo? Escribe o escanea su clave:</p>
-      <input class="sy-input clave" id="sy-clave" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" />
+      <input class="sy-input clave" id="sy-clave" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" enterkeyhint="go" />
       <div class="sy-row"><button class="btn" id="sy-scan">📷 Escanear QR</button><button class="btn primary" id="sy-vincular">Vincular</button></div>
       <div class="sy-err" id="sy-err"></div>${avanzado}</div>`;
   } else {
@@ -967,14 +967,24 @@ function renderSyncBody(){
   const vb=document.getElementById('sy-vincular');
   if(vb) vb.addEventListener('click', ()=> vincularCon(document.getElementById('sy-clave').value));
   const sc=document.getElementById('sy-scan'); if(sc) sc.addEventListener('click', startScan);
-  const ci=document.getElementById('sy-clave'); if(ci) ci.addEventListener('input', ()=>{ const p=ci.selectionStart; ci.value=Sync.normalizarClave(ci.value).slice(0,19); });
+  const ci=document.getElementById('sy-clave');
+  if(ci){
+    // Al completar los 16 caracteres se vincula solo (no hace falta tocar el botón).
+    ci.addEventListener('input', ()=>{ ci.value=Sync.normalizarClave(ci.value).slice(0,19); if(Sync.claveLimpia(ci.value).length>=16) vincularCon(ci.value); });
+    ci.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); ci.blur(); vincularCon(ci.value); } });
+  }
 }
+let vinculando=false;
 async function vincularCon(texto){
+  if(vinculando || Sync.configured()) return;
   const err=document.getElementById('sy-err'); if(err) err.textContent='';
+  const vb=document.getElementById('sy-vincular'); if(vb){ vb.disabled=true; vb.textContent='Vinculando…'; }
+  vinculando=true;
   try{
     await Sync.vincular(texto);
     toast('Dispositivo vinculado'); renderSyncBody(); await Sync.run('vincular');
   }catch(e){ const m=(e.message||String(e)); if(err) err.textContent = m.includes('clave_invalida') ? 'Esa clave no existe. Revísala o crea un espacio nuevo.' : 'No se pudo vincular: '+m; else alert('No se pudo vincular: '+m); }
+  finally{ vinculando=false; const b=document.getElementById('sy-vincular'); if(b){ b.disabled=false; b.textContent='Vincular'; } }
 }
 function drawQr(text){
   const box=document.getElementById('sy-qr'); if(!box) return;
