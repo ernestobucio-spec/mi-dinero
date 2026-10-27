@@ -101,7 +101,7 @@ async function init(){
   handleLinkHash();
   render();
   if('serviceWorker' in navigator && !IS_ELECTRON && location.protocol.startsWith('http')){
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(()=>{});
   }
   Sync.start();
 }

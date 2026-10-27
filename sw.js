@@ -1,6 +1,6 @@
 // Service worker: guarda la app dentro del teléfono para que abra sin señal.
 // Sube el número de versión cada vez que cambie algún archivo de la app.
-const CACHE = 'midinero-v2.1.1';
+const CACHE = 'midinero-v2.1.2';
 const ASSETS = [
   './', './index.html', './styles.css', './app.js', './store.js', './sync.js', './config.js',
   './qrcode.js', './jsQR.js', './manifest.json', './icon-180.png', './icon-192.png', './icon-512.png',
@@ -26,7 +26,7 @@ self.addEventListener('fetch', event => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
   event.respondWith(
-    fetch(req).then(res => {
+    fetch(req, { cache: 'no-cache' }).then(res => {
       if (res && res.status === 200) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
       return res;
     }).catch(() => caches.match(req).then(hit => hit || (req.mode === 'navigate' ? caches.match('./index.html') : undefined)))
