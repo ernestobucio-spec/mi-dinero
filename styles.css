@@ -588,3 +588,12 @@ html[data-tema="madrid"] .track > i { background: #febe10; }
 html[data-tema="madrid"] .nw-bar { background: linear-gradient(180deg, #ffd65c, #febe10); }
 html[data-tema="madrid"] .period-chip, html[data-tema="madrid"] .cal-cell.today { border: 1px solid rgba(254,190,16,.4); }
 html[data-tema="madrid"] .tema-card.active { box-shadow: 0 0 0 2px rgba(254,190,16,.35); }
+
+/* ---- Caja fuerte (v2.1.1) ---- */
+.ct-hero { margin: 16px 18px 4px; background: linear-gradient(135deg, #1d2a4a 0%, #14202f 100%); border: 1px solid var(--line); border-radius: 16px; padding: 18px 22px; }
+.ct-hero-l { font-size: 12px; color: #9fb4d8; text-transform: uppercase; letter-spacing: .6px; }
+.ct-hero-v { font-size: 34px; font-weight: 700; margin-top: 4px; color: var(--green); }
+.ct-hero-s { font-size: 13px; color: #a9b6cc; margin-top: 6px; }
+html[data-tema="madrid"] .ct-hero { background: linear-gradient(135deg, rgba(31,24,92,.85) 0%, rgba(8,8,30,.85) 100%); border-color: rgba(254,190,16,.45); }
+html[data-tema="madrid"] .ct-hero-l { color: #febe10; }
+@media (max-width: 859px) { .ct-hero { margin: 12px 14px 4px; padding: 14px 16px; } .ct-hero-v { font-size: 28px; } }

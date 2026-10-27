@@ -182,7 +182,7 @@ function bindChrome(){
   document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('mousedown', e=>{ if(e.target===o){ if(o.id==='scan-overlay') stopScan(); o.classList.add('hidden'); afterModalClose(); } }));
 }
 
-const TITLES = { resumen:'Resumen', saldo:'Saldo', hoy:()=>MES_LARGO[calM]+' '+calY,
+const TITLES = { resumen:'Resumen', saldo:'Saldo', caja:'Caja fuerte', hoy:()=>MES_LARGO[calM]+' '+calY,
   presupuesto:()=>MES_CORTO[infM]+' '+infY, metas:'Metas de ahorro', deudas:'Deudas', informes:'Informes', mas:'Más' };
 function setTitle(){
   const t = TITLES[view];
@@ -191,7 +191,7 @@ function setTitle(){
   const be=document.getElementById('btn-edit');
   be.style.visibility = editable ? 'visible':'hidden';
   be.textContent = (view==='metas'||view==='deudas') ? 'Nueva' : (isMobile()?'+ Cuenta':'Editar');
-  document.getElementById('btn-add').style.visibility = (view==='informes'||view==='metas'||view==='deudas') ? 'hidden':'visible';
+  document.getElementById('btn-add').style.visibility = (view==='informes'||view==='metas'||view==='deudas'||view==='caja') ? 'hidden':'visible';
 }
 function navTo(v){
   view=v;
@@ -201,7 +201,7 @@ function navTo(v){
 function render(){
   setTitle();
   const root = document.getElementById('view-root');
-  const fn = { resumen:renderResumen, saldo:renderSaldo, hoy:renderHoy, presupuesto:renderPresupuesto,
+  const fn = { resumen:renderResumen, saldo:renderSaldo, caja:renderConteo, hoy:renderHoy, presupuesto:renderPresupuesto,
     metas:renderMetas, deudas:renderDeudas, informes:renderInformes, mas:renderMas }[view] || renderResumen;
   root.innerHTML = fn();
   root.scrollTop = 0;
@@ -214,6 +214,7 @@ function renderResumen(){
   const t = monthTotals(today.getFullYear(), today.getMonth());
   const rate = t.ing>0 ? Math.round((t.net/t.ing)*100) : 0;
   const assets = totalAssets(), debt = totalDebt();
+  const cajaTot = conteoTotales(conteoRec().cant);
 
   const spend = {};
   transactions().forEach(x=>{ if(x.kind==='gasto'&&inMonth(x.date,today.getFullYear(),today.getMonth())) spend[x.category]=(spend[x.category]||0)+x.amount; });
@@ -266,6 +267,8 @@ function renderResumen(){
       <div class="kpi"><div class="k-label">Gastos</div><div class="k-val" style="color:var(--red)">${fmt(t.gas)}</div><div class="k-foot">${MES_LARGO[today.getMonth()]}</div></div>
       <div class="kpi"><div class="k-label">Ahorro</div><div class="k-val" style="color:${t.net<0?'var(--red)':'var(--green)'}">${fmt(t.net)}</div><div class="k-foot savings-rate">Tasa: ${rate}%</div></div>
     </div>
+    <div class="dash-sec-title">Caja fuerte <span class="more" data-go="caja">Ver conteo</span></div>
+    <div class="dash-card"><div class="up-row" data-go="caja" style="cursor:pointer"><div class="u-ico">🔐</div><div class="u-mid"><div class="u-name">Efectivo contado</div><div class="u-date" style="color:var(--muted)">Billetes ${fmt(cajaTot.b)} · Pacas ${fmt(cajaTot.p)}</div></div><div class="u-amt" style="color:var(--green)">${fmt(cajaTot.t)}</div></div></div>
     <div class="dash-sec-title">Presupuesto del mes <span class="more" data-go="presupuesto">Ver todo</span></div>
     <div class="dash-card">${budHtml}</div>
     <div class="dash-sec-title">Metas de ahorro <span class="more" data-go="metas">Ver todo</span></div>
@@ -300,7 +303,6 @@ function segHtml(modo){
   return `<div class="seg"><button class="seg-btn ${modo==='mov'?'active':''}" data-modo="mov">Movimientos</button><button class="seg-btn ${modo==='conteo'?'active':''}" data-modo="conteo">Conteo de efectivo</button></div>`;
 }
 function renderSaldo(){
-  if(saldoModo==='conteo') return renderConteo();
   const accs=accounts();
   if(!accs.some(a=>a.id===state.selectedAccount)) state.selectedAccount = accs[0] && accs[0].id;
   const corr = accs.filter(a=>a.type!=='credito'), cred = accs.filter(a=>a.type==='credito');
@@ -323,7 +325,7 @@ function renderSaldo(){
       <div class="tx-right"><span class="tx-amount ${cls}">${fmt(Math.abs(t.amount))}</span><div class="tx-running">${fmt(run[t.id])}</div></div></div>`;
   }).join('') : '<div class="empty">Sin movimientos para esta cuenta</div>';
 
-  return `<div class="saldo-outer">${segHtml('mov')}<div class="saldo-wrap"><div class="accounts-col">
+  return `<div class="saldo-wrap"><div class="accounts-col">
       <div class="section-head"><span>Cuentas</span><span class="total">${fmt(totCorr)}</span></div>
       ${corr.map(accRow).join('')}
       <div class="section-head"><span>Tarjetas de crédito</span><span class="total">${fmt(totCred)}</span></div>
@@ -331,7 +333,7 @@ function renderSaldo(){
       <div class="add-account" id="add-acc">+ Cuenta</div>
     </div><div class="tx-col">
       <div class="search-wrap"><input id="tx-search" type="search" placeholder="🔍  Buscar movimientos…" value="${esc(searchQ)}" /></div>
-      ${txHtml}</div></div></div>`;
+      ${txHtml}</div></div>`;
 }
 
 
@@ -355,7 +357,8 @@ function renderConteo(){
   const r=conteoRec(); const c=r.cant; const t=conteoTotales(c);
   const fila=(k,d)=>`<div class="ct-row"><input class="ct-in" data-k="${k}" type="number" inputmode="numeric" min="0" placeholder="0" value="${c[k]?esc(c[k]):''}" /><span class="ct-den">${fmt(d)}</span><span class="ct-sub" data-sub="${k}">${fmt(d*(Number(c[k])||0))}</span></div>`;
   const head=`<div class="ct-head"><span>Cantidad</span><span>Denominación</span><span>Subtotal</span></div>`;
-  return `<div class="conteo-wrap">${segHtml('conteo')}
+  return `<div class="conteo-wrap">
+    <div class="ct-hero"><div class="ct-hero-l">🔐 Caja fuerte</div><div class="ct-hero-v">${fmt(t.t)}</div><div class="ct-hero-s">Billetes ${fmt(t.b)} · Pacas ${fmt(t.p)}</div></div>
     <div class="ct-grid">
       <div class="ct-card"><div class="ct-title">Billetes y monedas</div>${head}
         ${CONTEO_BILLETES.map(d=>fila('b'+d,d)).join('')}
@@ -376,6 +379,7 @@ function conteoInput(inp){
   const t=conteoTotales(r.cant);
   const eb=document.getElementById('ct-b'), ep=document.getElementById('ct-p'), et=document.getElementById('ct-t');
   if(eb) eb.textContent=fmt(t.b); if(ep) ep.textContent=fmt(t.p); if(et) et.textContent=fmt(t.t);
+  const hv=document.querySelector('.ct-hero-v'), hs=document.querySelector('.ct-hero-s'); if(hv) hv.textContent=fmt(t.t); if(hs) hs.textContent=`Billetes ${fmt(t.b)} · Pacas ${fmt(t.p)}`;
   clearTimeout(conteoTimer); conteoTimer=setTimeout(()=>touch('conteos', r), 600);
 }
 function conteoClear(){
@@ -599,6 +603,7 @@ function renderMas(){
   const row=(ico,txt,sub,act)=>`<div class="mas-row" data-act="${act}"><div class="m-ico">${ico}</div><div class="m-txt">${txt}${sub?`<div class="m-sub">${esc(sub)}</div>`:''}</div><span class="m-chev">›</span></div>`;
   return `<div class="mas-wrap">
     <div class="mas-card">
+      ${row('🔐','Caja fuerte', fmt(conteoTotales(conteoRec().cant).t)+' contados','view:caja')}
       ${row('📅','Calendario (Hoy)','Movimientos por día y planificados','view:hoy')}
       ${row('🎯','Metas de ahorro',`${goals().length} metas`,'view:metas')}
       ${row('💳','Deudas',debts().length?fmt(totalDebt())+' en total':'Sin deudas','view:deudas')}
