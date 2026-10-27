@@ -59,7 +59,8 @@ function effect(t,id){
 }
 function balanceOf(a){ return (Number(a.saldoInicial)||0) + transactions().reduce((s,t)=>s+effect(t,a.id),0); }
 function inMonth(iso,y,m){ const d=parseISO(iso); return d.getFullYear()===y && d.getMonth()===m; }
-function totalAssets(){ return accounts().reduce((s,a)=>s+balanceOf(a),0); }
+function cajaTotal(){ return conteoTotales(conteoRec().cant).t; }
+function totalAssets(){ return accounts().reduce((s,a)=>s+balanceOf(a),0) + cajaTotal(); }
 function totalDebt(){ return debts().reduce((s,d)=>s+(Number(d.balance)||0),0); }
 function totalNetWorth(){ return totalAssets() - totalDebt(); }
 function byDateAsc(a,b){ return a.date===b.date ? ((a.updatedAt||0)-(b.updatedAt||0)) : (a.date<b.date?-1:1); }
@@ -304,10 +305,16 @@ function segHtml(modo){
 }
 function renderSaldo(){
   const accs=accounts();
-  if(!accs.some(a=>a.id===state.selectedAccount)) state.selectedAccount = accs[0] && accs[0].id;
+  if(state.selectedAccount!=='cajafuerte' && !accs.some(a=>a.id===state.selectedAccount)) state.selectedAccount = accs[0] && accs[0].id;
   const corr = accs.filter(a=>a.type!=='credito'), cred = accs.filter(a=>a.type==='credito');
-  const totCorr = corr.reduce((s,a)=>s+balanceOf(a),0), totCred = cred.reduce((s,a)=>s+balanceOf(a),0);
+  const ct = cajaTotal(); const ctd = conteoTotales(conteoRec().cant);
+  const totCorr = corr.reduce((s,a)=>s+balanceOf(a),0) + ct, totCred = cred.reduce((s,a)=>s+balanceOf(a),0);
   const sel = state.selectedAccount;
+  const cajaRow = `<div class="acc-row ${sel==='cajafuerte'?'selected':''}" data-acc="cajafuerte">
+      <div class="acc-ico">🔐</div>
+      <div class="acc-info"><div class="acc-name">Caja fuerte</div>
+      <div class="acc-balance pos">${fmt(ct)}</div><div class="acc-edit" data-go="caja">Contar</div></div>
+      ${sel==='cajafuerte'?'<span class="check">✓</span>':''}</div>`;
   const accRow = a => { const b=balanceOf(a); return `<div class="acc-row ${a.id===sel?'selected':''}" data-acc="${a.id}">
       <div class="acc-ico">${a.type==='credito'?'💳':'👛'}</div>
       <div class="acc-info"><div class="acc-name">${esc(a.name)}</div>
@@ -317,7 +324,10 @@ function renderSaldo(){
   let txs = transactions().filter(t=>affects(t,sel)).slice().sort(byDateDesc);
   const run = runningFor(sel);
   if(searchQ){ const q=searchQ.toLowerCase(); txs = txs.filter(t=> (t.desc||'').toLowerCase().includes(q) || (t.category||'').toLowerCase().includes(q)); }
-  const txHtml = txs.length ? txs.map(t=>{
+  const txHtml = sel==='cajafuerte' ? `<div class="caja-acc"><div class="caja-acc-ico">🔐</div><div class="caja-acc-t">Caja fuerte: ${fmt(ct)}</div>
+      <div class="caja-acc-s">Billetes y monedas ${fmt(ctd.b)} · Pacas ${fmt(ctd.p)}</div>
+      <div class="caja-acc-n">Esta cuenta se calcula sola a partir del conteo y suma a tu patrimonio. No recibe movimientos.</div>
+      <button class="btn primary" data-go="caja">Abrir el conteo</button></div>` : txs.length ? txs.map(t=>{
     const e = effect(t,sel);
     const cls = t.kind==='traspaso' ? 'traspaso' : (e<0?'gasto':'ingreso');
     return `<div class="tx-row" data-tx="${t.id}"><div class="tx-ico">${t.kind==='traspaso'?'🔄':catIco(t.category)}</div>
@@ -327,7 +337,7 @@ function renderSaldo(){
 
   return `<div class="saldo-wrap"><div class="accounts-col">
       <div class="section-head"><span>Cuentas</span><span class="total">${fmt(totCorr)}</span></div>
-      ${corr.map(accRow).join('')}
+      ${corr.map(accRow).join('')}${cajaRow}
       <div class="section-head"><span>Tarjetas de crédito</span><span class="total">${fmt(totCred)}</span></div>
       ${cred.map(accRow).join('')||'<div class="empty" style="padding:14px 16px">Ninguna</div>'}
       <div class="add-account" id="add-acc">+ Cuenta</div>
@@ -367,9 +377,9 @@ function renderConteo(){
         ${CONTEO_PACAS.map(d=>fila('p'+d,d)).join('')}
         <div class="ct-tot"><span>Subtotal pacas</span><b id="ct-p">${fmt(t.p)}</b></div>
         <div class="ct-tot grand"><span>Total caja fuerte</span><b id="ct-t">${fmt(t.t)}</b></div>
-        <div class="ct-note">El total de la caja = billetes + pacas. El conteo se guarda solo y se sincroniza entre tus dispositivos.</div></div>
+        <div class="ct-note">El total de la caja = billetes + pacas. La Caja fuerte aparece como cuenta en Saldo y suma a tu patrimonio. El conteo se guarda solo y se sincroniza entre tus dispositivos.</div></div>
     </div>
-    <div class="ct-actions"><button class="btn" id="ct-clear">Limpiar todo</button><button class="btn primary" id="ct-apply">Ajustar saldo de Efectivo al total</button></div>
+    <div class="ct-actions"><button class="btn" id="ct-clear">Limpiar todo</button></div>
   </div>`;
 }
 function conteoInput(inp){
@@ -945,7 +955,7 @@ function reportHtml(){
   const txs=monthTx(infY,infM);
   const cs={}; txs.forEach(t=>{ if(t.kind==='gasto') cs[t.category]=(cs[t.category]||0)+t.amount; });
   const cats=Object.keys(cs).sort((a,b)=>cs[b]-cs[a]);
-  const accRows=accounts().map(a=>`<tr><td>${esc(a.name)}</td><td style="text-align:right">${fmt(balanceOf(a))}</td></tr>`).join('');
+  const accRows=accounts().map(a=>`<tr><td>${esc(a.name)}</td><td style="text-align:right">${fmt(balanceOf(a))}</td></tr>`).join('') + `<tr><td>🔐 Caja fuerte (conteo)</td><td style="text-align:right">${fmt(cajaTotal())}</td></tr>`;
   const catRows=cats.map(c=>`<tr><td>${esc(c)}</td><td style="text-align:right">${fmt(cs[c])}</td><td style="text-align:right">${Math.round(cs[c]/(tot.gas||1)*100)}%</td></tr>`).join('')||'<tr><td colspan="3" style="color:#888">Sin gastos</td></tr>';
   const txRows=txs.map(t=>`<tr><td>${shortDate(t.date)}</td><td>${esc(t.desc)}</td><td>${esc(t.category||(t.kind==='traspaso'?'Traspaso':''))}</td><td>${esc(acc(t.account)?.name||'')}</td><td style="text-align:right;color:${t.kind==='ingreso'?'#179e4e':(t.kind==='gasto'?'#d12d22':'#333')}">${t.kind==='ingreso'?'+':(t.kind==='gasto'?'-':'')}${fmt(t.amount)}</td></tr>`).join('')||'<tr><td colspan="5" style="color:#888">Sin movimientos este mes</td></tr>';
   const goalsRows=goals().map(g=>{const p=g.target>0?Math.round(g.saved/g.target*100):0;return `<tr><td>${g.icon||''} ${esc(g.name)}</td><td style="text-align:right">${fmt(g.saved)} / ${fmt(g.target)}</td><td style="text-align:right">${p}%</td></tr>`;}).join('');
