@@ -49,6 +49,8 @@ function live(col){ return state[col].filter(r=>!r.deleted); }
 const accounts = ()=>live('accounts'), categories = ()=>live('categories'), transactions = ()=>live('transactions');
 const goals = ()=>live('goals'), debts = ()=>live('debts'), recurring = ()=>live('recurring');
 function acc(id){ return state.accounts.find(a=>a.id===id && !a.deleted); }
+function accName(id){ if(id==='cajafuerte') return 'Caja fuerte'; const a=acc(id); return a?a.name:''; }
+function esCaja(id){ return id==='cajafuerte'; }
 function catObj(name){ return state.categories.find(c=>c.name===name && !c.deleted); }
 function affects(t,id){ return t.account===id || t.accountTo===id; }
 function effect(t,id){
@@ -140,6 +142,8 @@ function bindChrome(){
   document.getElementById('btn-save').addEventListener('click', saveTx);
   document.getElementById('btn-delete').addEventListener('click', deleteTx);
   document.querySelectorAll('.mtab').forEach(t=> t.addEventListener('click',()=>{ editKind=t.dataset.kind; syncModalKind(); }));
+  document.getElementById('f-account').addEventListener('change', syncCajaPanel);
+  document.getElementById('f-account-to').addEventListener('change', syncCajaPanel);
   document.getElementById('f-category').addEventListener('change', e=>{
     if(e.target.value!=='__nueva') return;
     const n=prompt('Nombre de la nueva categoría:');
@@ -256,7 +260,7 @@ function renderResumen(){
     const sign = x.kind==='ingreso'?'+':(x.kind==='gasto'?'-':'');
     const col = x.kind==='ingreso'?'var(--green)':(x.kind==='gasto'?'var(--red)':'var(--text)');
     return `<div class="up-row" data-tx="${x.id}" style="cursor:pointer"><div class="u-ico">${x.kind==='traspaso'?'🔄':catIco(x.category)}</div>
-      <div class="u-mid"><div class="u-name">${esc(x.desc)}</div><div class="u-date" style="color:var(--muted)">${shortDate(x.date)} · ${esc(acc(x.account)?.name||'')}</div></div>
+      <div class="u-mid"><div class="u-name">${esc(x.desc)}</div><div class="u-date" style="color:var(--muted)">${shortDate(x.date)} · ${esc(accName(x.account))}${x.kind==='traspaso'?' → '+esc(accName(x.accountTo)):''}</div></div>
       <div class="u-amt" style="color:${col}">${sign}${fmt(x.amount)}</div></div>`;
   }).join('') : `<div class="dash-empty">Aún no hay movimientos. Pulsa “+” para registrar el primero.</div>`;
 
@@ -324,16 +328,15 @@ function renderSaldo(){
   let txs = transactions().filter(t=>affects(t,sel)).slice().sort(byDateDesc);
   const run = runningFor(sel);
   if(searchQ){ const q=searchQ.toLowerCase(); txs = txs.filter(t=> (t.desc||'').toLowerCase().includes(q) || (t.category||'').toLowerCase().includes(q)); }
-  const txHtml = sel==='cajafuerte' ? `<div class="caja-acc"><div class="caja-acc-ico">🔐</div><div class="caja-acc-t">Caja fuerte: ${fmt(ct)}</div>
-      <div class="caja-acc-s">Billetes y monedas ${fmt(ctd.b)} · Pacas ${fmt(ctd.p)}</div>
-      <div class="caja-acc-n">Esta cuenta se calcula sola a partir del conteo y suma a tu patrimonio. No recibe movimientos.</div>
-      <button class="btn primary" data-go="caja">Abrir el conteo</button></div>` : txs.length ? txs.map(t=>{
+  const cajaHead = sel==='cajafuerte' ? `<div class="caja-acc compact"><div class="caja-acc-t">🔐 ${fmt(ct)}</div><div class="caja-acc-s">Billetes y monedas ${fmt(ctd.b)} · Pacas ${fmt(ctd.p)}</div>
+      <div class="sy-row" style="margin-top:10px"><button class="btn" data-caja="retirar">⬆ Retirar de la caja</button><button class="btn" data-caja="depositar">⬇ Depositar a la caja</button><button class="btn primary" data-go="caja">Conteo</button></div></div>` : '';
+  const txHtml = cajaHead + (txs.length ? txs.map(t=>{
     const e = effect(t,sel);
     const cls = t.kind==='traspaso' ? 'traspaso' : (e<0?'gasto':'ingreso');
     return `<div class="tx-row" data-tx="${t.id}"><div class="tx-ico">${t.kind==='traspaso'?'🔄':catIco(t.category)}</div>
-      <div class="tx-main"><div class="tx-title">${esc(t.desc)}${t.planned?' ⏱':''}</div><div class="tx-sub">${shortDate(t.date)}${t.category?' · '+esc(t.category):''}</div></div>
-      <div class="tx-right"><span class="tx-amount ${cls}">${fmt(Math.abs(t.amount))}</span><div class="tx-running">${fmt(run[t.id])}</div></div></div>`;
-  }).join('') : '<div class="empty">Sin movimientos para esta cuenta</div>';
+      <div class="tx-main"><div class="tx-title">${esc(t.desc)}${t.planned?' ⏱':''}</div><div class="tx-sub">${shortDate(t.date)}${t.category?' · '+esc(t.category):''}${t.kind==='traspaso'?' · '+esc(accName(t.account))+' → '+esc(accName(t.accountTo)):''}${t.detalle?'<br>'+esc(detalleResumen(t.detalle)):''}</div></div>
+      <div class="tx-right"><span class="tx-amount ${cls}">${fmt(Math.abs(t.amount))}</span>${run[t.id]!==undefined?`<div class="tx-running">${fmt(run[t.id])}</div>`:''}</div></div>`;
+  }).join('') : '<div class="empty">Sin movimientos para esta cuenta</div>');
 
   return `<div class="saldo-wrap"><div class="accounts-col">
       <div class="section-head"><span>Cuentas</span><span class="total">${fmt(totCorr)}</span></div>
@@ -379,8 +382,18 @@ function renderConteo(){
         <div class="ct-tot grand"><span>Total caja fuerte</span><b id="ct-t">${fmt(t.t)}</b></div>
         <div class="ct-note">El total de la caja = billetes + pacas. La Caja fuerte aparece como cuenta en Saldo y suma a tu patrimonio. El conteo se guarda solo y se sincroniza entre tus dispositivos.</div></div>
     </div>
-    <div class="ct-actions"><button class="btn" id="ct-clear">Limpiar todo</button></div>
+    <div class="ct-actions"><button class="btn primary" data-caja="retirar">⬆ Retirar de la caja</button><button class="btn primary" data-caja="depositar">⬇ Depositar a la caja</button><button class="btn" id="ct-clear">Limpiar todo</button></div>
+    ${cajaHistorialHtml()}
   </div>`;
+}
+function cajaHistorialHtml(){
+  const txs=transactions().filter(t=>affects(t,'cajafuerte')).sort(byDateDesc).slice(0,15);
+  if(!txs.length) return `<div class="ct-hist"><div class="ct-title">Movimientos de la caja</div><div class="empty" style="padding:10px 0">Aún no hay retiros ni depósitos. Usa los botones de arriba.</div></div>`;
+  return `<div class="ct-hist"><div class="ct-title">Movimientos de la caja</div>${txs.map(t=>{
+    const rol=cajaRol(t.kind,t.account,t.accountTo); const sale=rol==='sale';
+    const otra = t.kind==='traspaso' ? (sale?accName(t.accountTo):accName(t.account)) : (t.category||'');
+    return `<div class="up-row" data-tx="${t.id}" style="cursor:pointer"><div class="u-ico">${sale?'⬆':'⬇'}</div><div class="u-mid"><div class="u-name">${esc(t.desc)}</div><div class="u-date" style="color:var(--muted)">${shortDate(t.date)} · ${sale?'a ':'de '}${esc(otra)}${t.detalle?' · '+esc(detalleResumen(t.detalle)):''}</div></div><div class="u-amt" style="color:${sale?'var(--red)':'var(--green)'}">${sale?'-':'+'}${fmt(t.amount)}</div></div>`;
+  }).join('')}</div>`;
 }
 function conteoInput(inp){
   const r=conteoRec(); const k=inp.dataset.k; const v=Math.max(0, Math.floor(Number(inp.value)||0));
@@ -638,6 +651,11 @@ function wireView(){
   document.querySelectorAll('.seg-btn[data-modo]').forEach(b=> b.addEventListener('click',()=>{ saldoModo=b.dataset.modo; render(); }));
   document.querySelectorAll('.ct-in').forEach(i=> i.addEventListener('input',()=>conteoInput(i)));
   const cc=document.getElementById('ct-clear'); if(cc) cc.addEventListener('click', conteoClear);
+  document.querySelectorAll('[data-caja]').forEach(b=> b.addEventListener('click', ()=>{
+    const otra=(accounts().find(a=>a.id===state.selectedAccount && a.id!=='cajafuerte')||accounts()[0]||{}).id;
+    if(b.dataset.caja==='retirar') openTxModal(null, { kind:'traspaso', account:'cajafuerte', accountTo:otra, desc:'Retiro de caja fuerte' });
+    else openTxModal(null, { kind:'traspaso', account:otra, accountTo:'cajafuerte', desc:'Depósito a caja fuerte' });
+  }));
   const ca=document.getElementById('ct-apply'); if(ca) ca.addEventListener('click', conteoApply);
   document.querySelectorAll('[data-tx]').forEach(r=> r.addEventListener('click',()=> openTxModal(r.dataset.tx)));
   document.querySelectorAll('[data-go]').forEach(r=> r.addEventListener('click',()=>{ navTo(r.dataset.go); }));
@@ -689,7 +707,7 @@ function payRecurring(id){
 /* ----------------------------- Modal: movimiento ----------------------------- */
 function fillSelectors(){
   document.getElementById('f-category').innerHTML = categories().map(c=>`<option value="${esc(c.name)}">${catIco(c.name)} ${esc(c.name)}</option>`).join('') + '<option value="__nueva">➕ Nueva categoría…</option>';
-  const accs = accounts().map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('');
+  const accs = accounts().map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('') + '<option value="cajafuerte">🔐 Caja fuerte</option>';
   document.getElementById('f-account').innerHTML = accs;
   document.getElementById('f-account-to').innerHTML = accs;
 }
@@ -698,8 +716,11 @@ function syncModalKind(){
   document.getElementById('lbl-category').classList.toggle('hidden', editKind==='traspaso');
   document.getElementById('lbl-account-to').classList.toggle('hidden', editKind!=='traspaso');
   document.querySelector('#lbl-account').firstChild.textContent = editKind==='traspaso' ? 'Cuenta origen' : 'Cuenta';
+  syncCajaPanel();
 }
-function openTxModal(id){
+let cajaDetalleEdit=null;
+function openTxModal(id, preset){
+  preset=preset||{};
   fillSelectors(); editTxId=id;
   const del=document.getElementById('btn-delete'); const rec=document.getElementById('f-recurring');
   if(id){
@@ -714,12 +735,14 @@ function openTxModal(id){
     document.getElementById('f-date').value=t.date;
     rec.checked=false; rec.parentElement.style.display='none';
     del.classList.remove('hidden');
+    cajaDetalleEdit = t.detalle ? Object.assign({}, t.detalle) : null;
   } else {
-    editKind='gasto';
+    editKind=preset.kind||'gasto'; cajaDetalleEdit=null;
     document.getElementById('modal-title').textContent='Nuevo movimiento';
-    document.getElementById('f-desc').value='';
+    document.getElementById('f-desc').value=preset.desc||'';
     document.getElementById('f-amount').value='';
-    document.getElementById('f-account').value=state.selectedAccount || (accounts()[0]||{}).id;
+    document.getElementById('f-account').value=preset.account || state.selectedAccount || (accounts()[0]||{}).id;
+    if(preset.accountTo) document.getElementById('f-account-to').value=preset.accountTo;
     document.getElementById('f-date').value=(view==='hoy'?selDay:isoOf(today));
     rec.checked=false; rec.parentElement.style.display='flex';
     del.classList.add('hidden');
@@ -729,28 +752,103 @@ function openTxModal(id){
   document.getElementById(id?'f-desc':'f-amount').focus();
 }
 function saveTx(){
-  const amount=Math.abs(parseFloat(document.getElementById('f-amount').value));
-  if(!amount||isNaN(amount)){ document.getElementById('f-amount').focus(); return; }
-  const desc=document.getElementById('f-desc').value.trim()||(editKind==='traspaso'?'Traspaso':'Sin nombre');
   const account=document.getElementById('f-account').value;
+  const accountTo=editKind==='traspaso'?document.getElementById('f-account-to').value:null;
+  const caja=cajaRol(editKind, account, accountTo);
+  let amount, detalle=null;
+  if(caja){
+    if(editKind==='traspaso' && account===accountTo){ alert('Elige una cuenta distinta a la caja fuerte.'); return; }
+    detalle=leerDetalleCaja(); amount=detalleTotal(detalle);
+    if(!amount){ alert('Indica qué billetes o pacas ' + (caja==='sale'?'salen de':'entran a') + ' la caja fuerte.'); return; }
+    if(caja==='sale'){
+      const disp=conteoDisponible(editTxId);
+      for(const k in detalle){ if(detalle[k]>(disp[k]||0)){ alert(`No hay suficientes de ${denomNombre(k)} en la caja (hay ${disp[k]||0}).`); return; } }
+    }
+  } else {
+    amount=Math.abs(parseFloat(document.getElementById('f-amount').value));
+    if(!amount||isNaN(amount)){ document.getElementById('f-amount').focus(); return; }
+  }
+  const desc=document.getElementById('f-desc').value.trim()||(editKind==='traspaso'?'Traspaso':'Sin nombre');
   const date=document.getElementById('f-date').value||isoOf(today);
   const data={ kind:editKind, desc, amount, account, date };
-  if(editKind==='traspaso') data.accountTo=document.getElementById('f-account-to').value;
+  if(editKind==='traspaso') data.accountTo=accountTo;
   else data.category=document.getElementById('f-category').value;
+  if(detalle) data.detalle=detalle;
   if(date>isoOf(today)) data.planned=true;
   if(editTxId){
     const t=state.transactions.find(x=>x.id===editTxId);
-    delete t.accountTo; delete t.planned; delete t.category;
+    if(t.detalle) aplicarDetalleCaja(t, -1);
+    delete t.accountTo; delete t.planned; delete t.category; delete t.detalle;
     Object.assign(t,data); touch('transactions', t);
+    if(t.detalle) aplicarDetalleCaja(t, +1);
   } else {
-    addRec('transactions', data);
-    if(document.getElementById('f-recurring').checked && editKind!=='traspaso'){
+    const t=addRec('transactions', data);
+    if(t.detalle) aplicarDetalleCaja(t, +1);
+    if(document.getElementById('f-recurring').checked && editKind!=='traspaso' && !caja){
       addRec('recurring', { desc, amount, kind:editKind, category:data.category, account, nextDate:addMonth(date), active:true });
     }
   }
   hide('modal-overlay'); render();
 }
-function deleteTx(){ if(editTxId) removeRec('transactions', editTxId); hide('modal-overlay'); render(); }
+function deleteTx(){
+  if(editTxId){ const t=state.transactions.find(x=>x.id===editTxId); if(t && t.detalle) aplicarDetalleCaja(t, -1); removeRec('transactions', editTxId); }
+  hide('modal-overlay'); render();
+}
+
+/* ----------------------------- Caja fuerte: movimientos por denominación ----------------------------- */
+// 'sale' si el dinero sale de la caja, 'entra' si entra, null si la caja no participa.
+function cajaRol(kind, account, accountTo){
+  if(kind==='traspaso'){ if(esCaja(account)) return 'sale'; if(esCaja(accountTo)) return 'entra'; return null; }
+  if(!esCaja(account)) return null;
+  return kind==='gasto' ? 'sale' : 'entra';
+}
+function denomNombre(k){ const d=Number(k.slice(1)); return (k[0]==='p'?'paca de ':'')+fmt(d); }
+function detalleTotal(det){ let s=0; for(const k in det) s+=Number(k.slice(1))*(Number(det[k])||0); return s; }
+function detalleResumen(det){
+  if(!det) return '';
+  const partes=[]; CONTEO_BILLETES.forEach(d=>{ if(det['b'+d]) partes.push(det['b'+d]+'×'+fmt(d)); });
+  CONTEO_PACAS.forEach(d=>{ if(det['p'+d]) partes.push(det['p'+d]+' paca'+(det['p'+d]>1?'s':'')+' '+fmt(d)); });
+  return partes.join(', ');
+}
+// Suma (+1) o resta (-1) al conteo el efecto de un movimiento con detalle.
+function aplicarDetalleCaja(t, signo){
+  const rol=cajaRol(t.kind, t.account, t.accountTo); if(!rol || !t.detalle) return;
+  const dir = (rol==='sale' ? -1 : 1) * signo;
+  const r=conteoRec();
+  for(const k in t.detalle){ const v=(Number(r.cant[k])||0) + dir*(Number(t.detalle[k])||0); if(v>0) r.cant[k]=v; else delete r.cant[k]; }
+  touch('conteos', r);
+}
+// Lo que hay en la caja, devolviendo lo que ya había sacado el movimiento que se edita.
+function conteoDisponible(editId){
+  const c=Object.assign({}, conteoRec().cant);
+  if(editId){ const t=state.transactions.find(x=>x.id===editId);
+    if(t && t.detalle && cajaRol(t.kind,t.account,t.accountTo)==='sale'){ for(const k in t.detalle) c[k]=(Number(c[k])||0)+Number(t.detalle[k]); } }
+  return c;
+}
+function leerDetalleCaja(){
+  const det={};
+  document.querySelectorAll('#f-caja-rows input[data-k]').forEach(i=>{ const v=Math.max(0,Math.floor(Number(i.value)||0)); if(v) det[i.dataset.k]=v; });
+  return det;
+}
+function syncCajaPanel(){
+  const account=document.getElementById('f-account').value;
+  const accountTo=document.getElementById('f-account-to').value;
+  const rol=cajaRol(editKind, account, accountTo);
+  const panel=document.getElementById('f-caja'); const amt=document.getElementById('f-amount');
+  if(!rol){ panel.classList.add('hidden'); amt.readOnly=false; amt.placeholder='0.00'; return; }
+  panel.classList.remove('hidden'); amt.readOnly=true; amt.placeholder='se calcula';
+  document.getElementById('f-caja-title').textContent = rol==='sale' ? '¿Qué sale de la caja fuerte?' : '¿Qué entra a la caja fuerte?';
+  const disp=conteoDisponible(editTxId); const det=cajaDetalleEdit||{};
+  const fila=(k,d)=>`<div class="caja-pick-row"><span class="cp-den">${k[0]==='p'?'Paca ':''}${fmt(d)}</span><input type="number" inputmode="numeric" min="0" data-k="${k}" placeholder="0" value="${det[k]||''}" />${rol==='sale'?`<span class="cp-disp">hay ${disp[k]||0}</span>`:'<span class="cp-disp"></span>'}</div>`;
+  document.getElementById('f-caja-rows').innerHTML = CONTEO_BILLETES.map(d=>fila('b'+d,d)).join('') + CONTEO_PACAS.map(d=>fila('p'+d,d)).join('');
+  document.querySelectorAll('#f-caja-rows input').forEach(i=> i.addEventListener('input', actualizarMontoCaja));
+  actualizarMontoCaja();
+}
+function actualizarMontoCaja(){
+  const total=detalleTotal(leerDetalleCaja());
+  document.getElementById('f-caja-sum').textContent=fmt(total);
+  document.getElementById('f-amount').value = total ? total : '';
+}
 
 /* ----------------------------- Modal: cuenta ----------------------------- */
 function openAccModal(id){

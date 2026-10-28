@@ -604,3 +604,19 @@ html[data-tema="madrid"] .ct-hero-l { color: #febe10; }
 .caja-acc-t { font-size: 22px; font-weight: 700; color: var(--green); }
 .caja-acc-s { font-size: 13px; color: var(--muted); margin-top: 6px; }
 .caja-acc-n { font-size: 12.5px; color: var(--muted); margin: 14px auto 18px; max-width: 420px; line-height: 1.5; }
+
+/* ---- Movimientos de la caja fuerte por denominación (v2.3) ---- */
+.caja-pick { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.caja-pick-title { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.caja-pick-row { display: grid; grid-template-columns: 1fr 86px 70px; align-items: center; gap: 8px; padding: 3px 0; }
+.caja-pick-row .cp-den { font-size: 13px; }
+.caja-pick-row input { background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; color: var(--text); font-size: 15px; text-align: right; outline: none; width: 100%; }
+.caja-pick-row input:focus { border-color: var(--accent); }
+.caja-pick-row .cp-disp { font-size: 11px; color: var(--muted); text-align: right; }
+.caja-pick-sum { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.caja-pick-sum b { color: var(--green); font-size: 15px; }
+.caja-acc.compact { padding: 16px 18px 12px; text-align: left; border-bottom: 1px solid var(--line); }
+.caja-acc.compact .caja-acc-t { font-size: 20px; }
+.caja-acc.compact .sy-row .btn { flex: 1; min-width: 120px; }
+.ct-hist { margin: 14px 18px 0; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px 4px; }
+@media (max-width: 859px) { .ct-hist { margin: 12px 14px 0; } .modal .caja-pick { max-height: 40dvh; overflow-y: auto; } }
