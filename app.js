@@ -750,7 +750,7 @@ function openTxModal(id, preset){
   }
   syncModalKind();
   show('modal-overlay');
-  document.getElementById(id?'f-desc':'f-amount').focus();
+  if(!isMobile()) document.getElementById(id?'f-desc':'f-amount').focus();
 }
 function saveTx(){
   const account=document.getElementById('f-account').value;
@@ -865,7 +865,7 @@ function openAccModal(id){
     document.getElementById('a-name').value=''; document.getElementById('a-type').value='corriente';
     document.getElementById('a-balance').value=''; del.classList.add('hidden');
   }
-  show('acc-overlay'); document.getElementById('a-name').focus();
+  show('acc-overlay'); if(!isMobile()) document.getElementById('a-name').focus();
 }
 function saveAcc(){
   const name=document.getElementById('a-name').value.trim()||'Cuenta';
@@ -907,7 +907,7 @@ function openGoalModal(id){
     document.getElementById('g-target').value=''; document.getElementById('g-saved').value='0';
     document.getElementById('g-date').value=''; del.classList.add('hidden');
   }
-  show('goal-overlay'); document.getElementById('g-name').focus();
+  show('goal-overlay'); if(!isMobile()) document.getElementById('g-name').focus();
 }
 function saveGoal(){
   const name=document.getElementById('g-name').value.trim()||'Meta';
@@ -920,7 +920,7 @@ function saveGoal(){
   hide('goal-overlay'); render();
 }
 function deleteGoal(){ removeRec('goals', editGoalId); hide('goal-overlay'); render(); }
-function openContrib(id){ contribGoalId=id; document.getElementById('c-amount').value=''; show('contrib-overlay'); document.getElementById('c-amount').focus(); }
+function openContrib(id){ contribGoalId=id; document.getElementById('c-amount').value=''; show('contrib-overlay'); if(!isMobile()) document.getElementById('c-amount').focus(); }
 function saveContrib(){
   const amt=Math.abs(parseFloat(document.getElementById('c-amount').value));
   if(amt&&!isNaN(amt)){ const g=state.goals.find(x=>x.id===contribGoalId); if(g){ g.saved=(Number(g.saved)||0)+amt; touch('goals', g); } }
@@ -931,7 +931,7 @@ function saveContrib(){
 function openBudgetModal(name){
   budgetCatName=name; document.getElementById('b-cat').value=name;
   const c=catObj(name); document.getElementById('b-amount').value=c?c.budget:0;
-  show('budget-overlay'); document.getElementById('b-amount').focus();
+  show('budget-overlay'); if(!isMobile()) document.getElementById('b-amount').focus();
 }
 function saveBudget(){
   const v=Math.abs(parseFloat(document.getElementById('b-amount').value))||0;
@@ -956,7 +956,7 @@ function openDebtModal(id){
     ['d-name','d-balance','d-original','d-apr','d-pay'].forEach(i=>document.getElementById(i).value='');
     document.getElementById('d-icon').value='💳'; del.classList.add('hidden');
   }
-  show('debt-overlay'); document.getElementById('d-name').focus();
+  show('debt-overlay'); if(!isMobile()) document.getElementById('d-name').focus();
 }
 function saveDebt(){
   const name=document.getElementById('d-name').value.trim()||'Deuda';
@@ -978,7 +978,7 @@ function openDebtPayment(id){
   document.getElementById('dp-acc-label').style.display='flex';
   document.getElementById('dp-account').innerHTML = accounts().map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('');
   document.getElementById('dp-account').value = state.selectedAccount || (accounts()[0]||{}).id;
-  show('dpay-overlay'); document.getElementById('dp-amount').focus();
+  show('dpay-overlay'); if(!isMobile()) document.getElementById('dp-amount').focus();
 }
 function saveDebtPayment(){
   const amt=Math.abs(parseFloat(document.getElementById('dp-amount').value));
@@ -1102,6 +1102,7 @@ async function exportPrintMonth(){
 // En iOS el teclado no reduce la ventana, solo la parte visible: ajustamos las hojas a lo visible
 // para que los botones queden donde se ven y los toques no caigan en otro lado.
 function bindViewport(){
+  return; // desactivado: el ajuste por visualViewport no mejoró los toques en iOS
   const vv=window.visualViewport; if(!vv) return;
   const upd=()=>{
     const r=document.documentElement.style;

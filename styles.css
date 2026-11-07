@@ -623,7 +623,6 @@ html[data-tema="madrid"] .ct-hero-l { color: #febe10; }
 
 /* ---- v2.3.1: hojas ajustadas al teclado de iOS y panel de caja sin scroll interno ---- */
 @media (max-width: 859px) {
-  .modal-overlay { inset: auto; top: var(--vvt, 0); left: 0; right: 0; height: var(--vvh, 100dvh); }
   .modal { max-height: 100%; }
   .modal .caja-pick { max-height: none; overflow: visible; }
 }
