@@ -100,6 +100,7 @@ async function init(){
   window.App = { state, onRemoteChange };
   document.getElementById('hoy-ico').textContent = today.getDate();
   applyTema();
+  bindViewport();
   bindChrome(); bindKeys(); bindSync(); bindTema();
   handleLinkHash();
   render();
@@ -839,8 +840,10 @@ function syncCajaPanel(){
   panel.classList.remove('hidden'); amt.readOnly=true; amt.placeholder='se calcula';
   document.getElementById('f-caja-title').textContent = rol==='sale' ? '¿Qué sale de la caja fuerte?' : '¿Qué entra a la caja fuerte?';
   const disp=conteoDisponible(editTxId); const det=cajaDetalleEdit||{};
-  const fila=(k,d)=>`<div class="caja-pick-row"><span class="cp-den">${k[0]==='p'?'Paca ':''}${fmt(d)}</span><input type="number" inputmode="numeric" min="0" data-k="${k}" placeholder="0" value="${det[k]||''}" />${rol==='sale'?`<span class="cp-disp">hay ${disp[k]||0}</span>`:'<span class="cp-disp"></span>'}</div>`;
-  document.getElementById('f-caja-rows').innerHTML = CONTEO_BILLETES.map(d=>fila('b'+d,d)).join('') + CONTEO_PACAS.map(d=>fila('p'+d,d)).join('');
+  const fila=(k,d)=>`<div class="caja-pick-row"><span class="cp-den">${k[0]==='p'?'Paca ':''}${fmt(d)}</span><input type="number" inputmode="numeric" min="0" ${rol==='sale'?`max="${disp[k]||0}"`:''} data-k="${k}" placeholder="0" value="${det[k]||''}" />${rol==='sale'?`<span class="cp-disp">hay ${disp[k]||0}</span>`:'<span class="cp-disp"></span>'}</div>`;
+  const todas=[...CONTEO_BILLETES.map(d=>['b'+d,d]), ...CONTEO_PACAS.map(d=>['p'+d,d])];
+  const lista = rol==='sale' ? todas.filter(([k])=> (disp[k]||0)>0 || det[k]) : todas;
+  document.getElementById('f-caja-rows').innerHTML = lista.length ? lista.map(([k,d])=>fila(k,d)).join('') : '<div class="cp-vacio">La caja fuerte está vacía. Primero cuenta lo que hay en Caja fuerte.</div>';
   document.querySelectorAll('#f-caja-rows input').forEach(i=> i.addEventListener('input', actualizarMontoCaja));
   actualizarMontoCaja();
 }
@@ -1094,6 +1097,19 @@ async function exportPrintMonth(){
   else { const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); }
 }
 
+
+/* ----------------------------- Viewport (teclado iOS) ----------------------------- */
+// En iOS el teclado no reduce la ventana, solo la parte visible: ajustamos las hojas a lo visible
+// para que los botones queden donde se ven y los toques no caigan en otro lado.
+function bindViewport(){
+  const vv=window.visualViewport; if(!vv) return;
+  const upd=()=>{
+    const r=document.documentElement.style;
+    r.setProperty('--vvh', Math.round(vv.height)+'px');
+    r.setProperty('--vvt', Math.round(vv.offsetTop)+'px');
+  };
+  vv.addEventListener('resize', upd); vv.addEventListener('scroll', upd); upd();
+}
 
 /* ----------------------------- Tema ----------------------------- */
 function temaActual(){ try{ return localStorage.getItem('midinero.tema')||'clasico'; }catch(e){ return 'clasico'; } }

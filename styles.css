@@ -620,3 +620,11 @@ html[data-tema="madrid"] .ct-hero-l { color: #febe10; }
 .caja-acc.compact .sy-row .btn { flex: 1; min-width: 120px; }
 .ct-hist { margin: 14px 18px 0; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px 4px; }
 @media (max-width: 859px) { .ct-hist { margin: 12px 14px 0; } .modal .caja-pick { max-height: 40dvh; overflow-y: auto; } }
+
+/* ---- v2.3.1: hojas ajustadas al teclado de iOS y panel de caja sin scroll interno ---- */
+@media (max-width: 859px) {
+  .modal-overlay { top: var(--vvt, 0); height: var(--vvh, 100dvh); inset: auto 0 auto 0; left: 0; right: 0; }
+  .modal { max-height: 100%; }
+  .modal .caja-pick { max-height: none; overflow: visible; }
+}
+.cp-vacio { font-size: 12.5px; color: var(--muted); padding: 6px 0; }
