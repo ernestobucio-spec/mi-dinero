@@ -1102,7 +1102,9 @@ async function exportPrintMonth(){
 // En iOS el teclado no reduce la ventana, solo la parte visible: ajustamos las hojas a lo visible
 // para que los botones queden donde se ven y los toques no caigan en otro lado.
 function bindViewport(){
-  return; // desactivado: el ajuste por visualViewport no mejoró los toques en iOS
+  // iOS a veces desplaza el documento al enfocar un campo dentro de una hoja fija; al salir del campo lo regresamos.
+  document.addEventListener('focusout', ()=>{ setTimeout(()=>{ window.scrollTo(0,0); document.documentElement.scrollTop=0; document.body.scrollTop=0; }, 60); });
+  return; // el ajuste por visualViewport sigue desactivado
   const vv=window.visualViewport; if(!vv) return;
   const upd=()=>{
     const r=document.documentElement.style;
